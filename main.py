@@ -26,7 +26,7 @@ conn = pyodbc.connect(connection_string)
 cursor = conn.cursor()
 
 #query = "SELECT TOP (100) [ITEM_CODE] as 'item_number' FROM [MSIMatrix].[dbo].[msi_Item_Master]"
-query = "SELECT TOP (200) sim.item_number,sim.item_description,CASE WHEN im.item_code IS NULL THEN 'N' ELSE 'Y' END AS 'inMatrix' FROM   msi_staging_item_master sim LEFT JOIN ent_item_master im ON im.item_code = sim.item_number WHERE im.item_code IS NOT NULL"
+query = "SELECT sim.item_number,sim.item_description,CASE WHEN im.item_code IS NULL THEN 'N' ELSE 'Y' END AS 'inMatrix' FROM   msi_staging_item_master sim LEFT JOIN ent_item_master im ON im.item_code = sim.item_number WHERE im.item_code IS NOT NULL"
 cursor.execute(query)
 db_items = [row.item_number for row in cursor.fetchall()]
 
@@ -43,8 +43,6 @@ failed_items = []  # List to store failed items
 def save_image(item_number, image_url):
     image_path = os.path.join(directory, f"{item_number}.jpg")
     try:
-        #urllib.request.urlretrieve(image_url, image_path)
-
         headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/58.0.3029.110 Safari/537.36'}
         req = urllib.request.Request(image_url, headers=headers)
         response = urllib.request.urlopen(req)
@@ -54,10 +52,13 @@ def save_image(item_number, image_url):
         return True
     except Exception as e:
         #print(f"Failed to download image for item {item_number}: {e}")
-        #failed_items.append(item_number)
         return False
 
 def search_MSC(brand, mpn):
+    # Note: MSC Download is not perfect. This is a quick and dirty download using their autocomplete search results.
+    # Unfortunately it seems MSC has implemented some bot protections and time hasn't been spent to bypass and do more
+    # proper crawling. However, it does work as a last ditch effort to get an image.
+
     headers = {"brUid": "uid=4797467037409:v=12.0:ts=1653171470053:hc=1006"}
     url = f"https://www.mscdirect.com/search/suggestions/beta?searchterm={mpn}"
 
@@ -65,7 +66,7 @@ def search_MSC(brand, mpn):
     
     data = json.loads(response.text)
 
-    # 5. Check if "searchSuggestion" array exists and "alternatePartNumber" matches ITEM_NUMBER
+    # Check if "searchSuggestion" array exists and "alternatePartNumber" matches ITEM_NUMBER
     search_suggestions = data.get("searchSuggestion", [])
     for suggestion in search_suggestions:
         alternate_part_number = suggestion.get("alternatePartNumber", None)
@@ -74,7 +75,7 @@ def search_MSC(brand, mpn):
             continue
 
         if alternate_part_number == mpn or (mpn in alternate_part_number and brand in alternate_part_number):
-            # 6. Download the image using "largeImageLink"
+            # Download the image using "largeImageLink"
             image_info = suggestion.get("imageInfo", {})
             large_image_link = image_info.get("largeImageLink", "")
 
@@ -83,7 +84,6 @@ def search_MSC(brand, mpn):
                 return save_image(brand + " " + mpn, image_url)
             break
     else:
-        #failed_items.append(brand + " " + mpn)
         return False
 
 def search_YG1(brand, mpn):
@@ -100,7 +100,6 @@ def search_YG1(brand, mpn):
     return save_image(brand + " " + mpn, image_url)
 
 def search_MIT(brand, mpn):
-
     # First we are going to use google to find the product page, because the MIT website sucks.
     query = f"site:mitsubishicarbide.net/mmus/ EDP {mpn}"
     # send search query and retrieve HTML content of search results page
@@ -176,7 +175,7 @@ def process_item(item_number):
     if not foundImage: 
         failed_items.append(item_number)
         
-# Replace the loop in step 4 with the following code to parallelize it
+# Run multiple threads of our primary processing to speed things up.
 num_threads = 10  # Set the number of threads based on your requirements
 with ThreadPoolExecutor(max_workers=num_threads) as executor:
     results = list(tqdm(executor.map(process_item, unique_items), total=len(unique_items)))
