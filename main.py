@@ -34,9 +34,22 @@ db_items = [row.item_number for row in cursor.fetchall()]
 directory = args.imgdir
 file_list = os.listdir(directory)
 
+def load_excluded_items(file_path):
+    excluded_items = set()
+    with open(file_path, "r") as f:
+        for line in f:
+            excluded_item = line.strip()
+            if excluded_item:
+                excluded_items.add(excluded_item)
+    return excluded_items
+
 # 3. Compare the list from the database with the list from the directory and remove duplicates
 file_list_without_extensions = [os.path.splitext(file)[0] for file in file_list]
 unique_items = set(db_items) - set(file_list_without_extensions)
+
+# Load excluded items from the excluded.txt file and remove them from unique_items
+excluded_items = load_excluded_items("excluded.txt")
+unique_items = unique_items - excluded_items
 
 failed_items = []  # List to store failed items
 
