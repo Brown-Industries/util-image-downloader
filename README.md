@@ -4,7 +4,11 @@ This is a python utility to download tooling images from a variety of sources to
 
 ## Usage
 
-`python3 main.py --help` : for genearl usage information
+Tested and used with python 3.11. 
+
+`pip install -r requirements.txt` to install needed modules.
+
+`python main.py --help` : for genearl usage information
 
 ### Arguments
  `--imgdir`: Directory to save images

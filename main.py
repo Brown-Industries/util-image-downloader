@@ -145,7 +145,7 @@ def process_item(item_number):
     brand = item_number[:3] # The first 3 characters
     mpn = item_number[4:]   # All but the first 4 characters
 
-    image_url = f"https://tools.brnind.com/{urllib.parse.quote(item_number)}.jpg"
+    image_url = f"https://zuwzc.brnind.com/{urllib.parse.quote(item_number)}.jpg"
     foundImage = save_image(item_number, image_url)
     if foundImage:
         return
